@@ -8,7 +8,7 @@ GREEN = (0, 255, 0)
 BLACK = (0, 0, 0)
 
 
-def rotation(points, theta):
+def rotation(mat, theta):
     """
     Applies a rotation transformation
     """
@@ -16,12 +16,12 @@ def rotation(points, theta):
     s = np.sin(theta)
     R = np.array([[c, -s],
                   [s,  c]])
-    return points @ R.T
+    return mat @ R.T
 
 
 def polygon(screen, pts):
     """
-    Draws a pygame polygon from a list of points
+    Draws a pygame polygon from a 2D array of points
     """
     pygame.draw.polygon(screen, GREEN, pts.tolist(), 5)
 
@@ -68,20 +68,21 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("simple drone simulation")
 clock = pygame.time.Clock()
 
-a, b = 25, 100
+a, b = 15, 75
 rect_local = np.array([[-b,  a],
-                       [-b, -a],
-                       [b, -a],
+                       [-b*0.7, -a],
+                       [b*0.7, -a],
                        [b,  a]])
 
 pos = np.array([WIDTH/2, HEIGHT/4])
 vel = np.array([120.0, 0.0])
 
 mass = 2.0
+# moment of inertia of a rectangle about the centroid
 J = (1/12)*mass*((2*b)**2 + (2*a)**2)
-g = 900.0  # px/s^2
-theta = 0
-omega = 15.0
+g = 900  # px/s^2
+theta = 1  # initial starting angle
+omega = 90  # initial applied angular velocity
 
 e = 0.6  # bounciness [0,1]
 
