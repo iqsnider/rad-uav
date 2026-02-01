@@ -24,7 +24,7 @@ def lagrange_multiplier(p, pdot, q, qdot, u, L, md, mp) -> float:
     return num/den
 
 
-def slung_payload_system(t, x, u, L, md, mp, g=9.81):
+def slung_payload_system(t, x, L, md, mp, g=9.81):
     """
     """
     p = x[0:3]
@@ -84,10 +84,8 @@ if __name__ == '__main__':
     t0, tf = 0, 5
     t_eval = np.linspace(t0, tf, 200)
 
-    def ode(t, x):
-        return slung_payload_system(t, x, lambda tt, xx: control(tt, xx, md, mp, g), L, md, mp, g=g)
-
-    sol = solve_ivp(ode, (t0, tf), x0, t_eval=t_eval)
+    sol = solve_ivp(slung_payload_system, (t0, tf), x0,
+                    args=(L, md, mp, g), t_eval=t_eval)
 
     X = sol.y.T
 
