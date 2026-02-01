@@ -9,12 +9,6 @@ def lagrange_multiplier(p, pdot, q, qdot, u, L, md, mp) -> float:
     """
     Computes the lagrange multiplier of the taught slung payload problem.
     """
-    p = np.asarray(p).reshape(3,)
-    q = np.asarray(q).reshape(3,)
-    pdot = np.asarray(pdot).reshape(3,)
-    qdot = np.asarray(qdot).reshape(3,)
-    u = np.asarray(u).reshape(3,)
-
     r = q - p
     rd = qdot - pdot
 
