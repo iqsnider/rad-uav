@@ -34,13 +34,13 @@ class HexacopterSprite:
         self.frame_color = frame_color
         self.rotor_color = rotor_color
         self.front_color = front_color
-        self.front_rotor_index = 0
+        self.front_rotor_index = [0, 5]
 
         # initialize body-frame geometry
         L = self.arm_len
 
         # 3 arm directions in the body xy-plane 0, 60, 120 degrees
-        ang = np.deg2rad([0, 60, 120])
+        ang = np.deg2rad([30, 90, 150])
         # matrix of arm directions 3x3
         self.body_arm_dirs = np.vstack(
             [np.cos(ang), np.sin(ang), np.zeros_like(ang)])
@@ -83,7 +83,7 @@ class HexacopterSprite:
         # create rotors
         self._rotor_lines = []
         for i in range(6):
-            color = self.front_color if i == self.front_rotor_index else self.rotor_color
+            color = self.front_color if i in self.front_rotor_index else self.rotor_color
             line = ax.plot([0], [0], [0], lw=3, color=color)[0]
             self._rotor_lines.append(line)
 
