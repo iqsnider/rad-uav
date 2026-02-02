@@ -54,9 +54,8 @@ def control(t, x, md, mp, g=9.81):
     pdot = x[3:6]
 
     # desired state
-    desired_z = 2
-    desired_pos = np.array([0, 0, desired_z])
-    desired_vel = np.zeros(3)
+    desired_pos = np.array([0, 0, 2])
+    desired_vel = np.array([0, 0, 0])
 
     # PD gains
     Kp_z = 5
@@ -105,8 +104,19 @@ if __name__ == '__main__':
     p = X[:, 0:3]
     q = X[:, 6:9]
 
-    fig = plt.figure()
+    parchment = "#f4f1ea"
+
+    fig = plt.figure(facecolor=parchment)
     ax = fig.add_subplot(111, projection='3d')
+    ax.set_facecolor(parchment)
+
+    for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
+        axis.pane.set_facecolor("#F8DE7E")
+        axis.pane.set_edgecolor("#d8d2c5")
+        axis.pane.set_alpha(1.0)
+
+    ax.grid(color="#d0c8b8", linestyle="--", linewidth=0.5)
+    ax.tick_params(colors="#3a3a3a")
 
     # additional cable, payload, and attachment artists
     cable_line = ax.plot([p[0, 0], q[0, 0]], [p[0, 1], q[0, 1]], [
@@ -133,7 +143,7 @@ if __name__ == '__main__':
     drone.set_axes_equal(ax)
 
     def animate(k):
-        # drone.update(p=p[k], roll=0, pitch=0, yaw=0)
+        drone.update(p=p[k], roll=0, pitch=0, yaw=0)
 
         payload_point.set_data_3d([q[k, 0]], [q[k, 1]], [q[k, 2]])
         attach_point.set_data_3d([p[k, 0]], [p[k, 1]], [p[k, 2]])
