@@ -48,14 +48,30 @@ def slung_payload_system(t, x, L, md, mp, g=9.81):
 
 def control(t, x, md, mp, g=9.81):
     """
-    Just a test input
+    PD controller
     """
-    # uz = (md + mp)*g
-    # ux = np.sin(2*np.pi*0.4*t)
-    # uy = 0.5*np.cos(2*np.pi*0.4*t)
-    uz = (md + mp)*g
-    ux = 0
-    uy = 0
+    p = x[0:3]
+    pdot = x[3:6]
+
+    # desired state
+    desired_z = 2
+    desired_pos = np.array([0, 0, desired_z])
+    desired_vel = np.zeros(3)
+
+    # PD gains
+    Kp_z = 5
+    Kd_z = 4
+
+    Kp_xy = 3
+    Kd_xy = 2
+
+    # errors
+    pos_error = desired_pos - p
+    vel_error = desired_vel - pdot
+
+    ux = Kp_xy*pos_error[0] + Kd_xy*vel_error[0]
+    uy = Kp_xy*pos_error[1] + Kd_xy*vel_error[1]
+    uz = (md + mp)*g + Kp_z*pos_error[2] + Kd_z*vel_error[2]
 
     return np.array([ux, uy, uz])
 
@@ -71,13 +87,15 @@ if __name__ == '__main__':
     v0 = np.array([0, 0, 0])
     q0 = p0 + np.array([0, 0, -L])
     # non-physical to apply an initial z velocity to the payload and not the drone
-    w0 = v0 + np.array([1, 0.5, 0])
+    w0 = v0 + np.array([2, 1, 0])
 
     x0 = np.hstack([p0, v0, q0, w0])
 
-    # solve
-    t0, tf = 0, 5
-    t_eval = np.linspace(t0, tf, 200)
+    # make proper frame rate for animation
+    t0, tf = 0, 30
+    fps = 30
+    total_frames = fps*(tf - t0)
+    t_eval = np.linspace(t0, tf, total_frames)
 
     sol = solve_ivp(slung_payload_system, (t0, tf), x0,
                     args=(L, md, mp, g), t_eval=t_eval)
@@ -90,11 +108,13 @@ if __name__ == '__main__':
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
-    # artists for payload + cable
+    # additional cable, payload, and attachment artists
     cable_line = ax.plot([p[0, 0], q[0, 0]], [p[0, 1], q[0, 1]], [
         p[0, 2], q[0, 2]], color="gray", lw=2)[0]
     payload_point = ax.plot([q[0, 0]], [q[0, 1]], [q[0, 2]],
                             color='c', marker='o', markersize=7)[0]
+    attach_point = ax.plot([p[0, 0]], [p[0, 1]], [p[0, 2]],
+                           color='m', marker='o', markersize=7)[0]
 
     drone = HexacopterSprite(arm_len=0.5, rotor_r=0.1).draw(ax)
 
@@ -113,12 +133,13 @@ if __name__ == '__main__':
     drone.set_axes_equal(ax)
 
     def animate(k):
-        drone.update(p=p[k], roll=0, pitch=0, yaw=0)
+        # drone.update(p=p[k], roll=0, pitch=0, yaw=0)
 
         payload_point.set_data_3d([q[k, 0]], [q[k, 1]], [q[k, 2]])
+        attach_point.set_data_3d([p[k, 0]], [p[k, 1]], [p[k, 2]])
         cable_line.set_data_3d([p[k, 0], q[k, 0]], [
             p[k, 1], q[k, 1]], [p[k, 2], q[k, 2]])
-        return drone._arm_lines + drone._rotor_lines + [payload_point, cable_line]
+        return drone._arm_lines + drone._rotor_lines + [payload_point, attach_point, cable_line]
 
     ani = FuncAnimation(fig, animate, frames=len(
         t_eval), interval=20)
