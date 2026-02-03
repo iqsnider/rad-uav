@@ -126,6 +126,17 @@ if __name__ == '__main__':
     attach_point = ax.plot([p[0, 0]], [p[0, 1]], [p[0, 2]],
                            color='m', marker='o', markersize=7)[0]
 
+    def plot_3d_plus(ax, x, y, z, size=0.1, color='k', lw=1):
+        """
+        Plots a 3D plus marker
+        """
+        ax.plot([x - size, x + size], [y, y], [z, z], color=color, lw=lw)
+        ax.plot([x, x], [y - size, y + size], [z, z], color=color, lw=lw)
+        ax.plot([x, x], [y, y], [z - size, z + size], color=color, lw=lw)
+
+    plot_3d_plus(ax, p[0, 0],  p[0, 1],  p[0, 2],  size=0.3, color='#32CD32')
+    plot_3d_plus(ax, 0, 0, 2, size=0.3, color='#E10600')
+
     drone = HexacopterSprite(arm_len=0.5, rotor_r=0.1).draw(ax)
 
     ax.set_xlabel("X")
@@ -143,7 +154,7 @@ if __name__ == '__main__':
     drone.set_axes_equal(ax)
 
     def animate(k):
-        drone.update(p=p[k], roll=0, pitch=0, yaw=0)
+        # drone.update(p=p[k], roll=0, pitch=0, yaw=0)
 
         payload_point.set_data_3d([q[k, 0]], [q[k, 1]], [q[k, 2]])
         attach_point.set_data_3d([p[k, 0]], [p[k, 1]], [p[k, 2]])
