@@ -19,7 +19,7 @@ def lagrange_multiplier(p, pdot, q, qdot, u, L, md, mp) -> float:
     return num/den
 
 
-def slung_payload_system(t, x, L, md, mp, g=9.81):
+def slung_payload_system(t, x, desired_pos, L, md, mp, g=9.81):
     """
     """
     p = x[0:3]
@@ -27,7 +27,7 @@ def slung_payload_system(t, x, L, md, mp, g=9.81):
     q = x[6:9]
     qdot = x[9:12]
 
-    u = control(t, x, md, mp, g)
+    u = control(t, x, md, mp, desired_pos, g)
 
     lam = lagrange_multiplier(p, pdot, q, qdot, u, L, md, mp)
     r = q - p
@@ -46,7 +46,7 @@ def slung_payload_system(t, x, L, md, mp, g=9.81):
     return xdot
 
 
-def control(t, x, md, mp, g=9.81):
+def control(t, x, md, mp, desired_pos=np.array([0, 1, 2]), g=9.81):
     """
     PD controller
     """
@@ -54,7 +54,6 @@ def control(t, x, md, mp, g=9.81):
     pdot = x[3:6]
 
     # desired state
-    desired_pos = np.array([0, 0, 2])
     desired_vel = np.array([0, 0, 0])
 
     # PD gains
@@ -86,7 +85,8 @@ if __name__ == '__main__':
     v0 = np.array([0, 0, 0])
     q0 = p0 + np.array([0, 0, -L])
     # non-physical to apply an initial z velocity to the payload and not the drone
-    w0 = v0 + np.array([2, 1, 0])
+    w0 = v0 + np.array([0, 0, 0])
+    desired_pos = np.array([2, 3, 2])
 
     x0 = np.hstack([p0, v0, q0, w0])
 
@@ -97,7 +97,7 @@ if __name__ == '__main__':
     t_eval = np.linspace(t0, tf, total_frames)
 
     sol = solve_ivp(slung_payload_system, (t0, tf), x0,
-                    args=(L, md, mp, g), t_eval=t_eval)
+                    args=(desired_pos, L, md, mp, g), t_eval=t_eval)
 
     X = sol.y.T
 
@@ -113,7 +113,7 @@ if __name__ == '__main__':
     for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
         axis.pane.set_facecolor("#F8DE7E")
         axis.pane.set_edgecolor("#d8d2c5")
-        axis.pane.set_alpha(1.0)
+        axis.pane.set_alpha(1)
 
     ax.grid(color="#d0c8b8", linestyle="--", linewidth=0.5)
     ax.tick_params(colors="#3a3a3a")
@@ -128,14 +128,15 @@ if __name__ == '__main__':
 
     def plot_3d_plus(ax, x, y, z, size=0.1, color='k', lw=1):
         """
-        Plots a 3D plus marker
+        Plots a 3D plus marker.
         """
         ax.plot([x - size, x + size], [y, y], [z, z], color=color, lw=lw)
         ax.plot([x, x], [y - size, y + size], [z, z], color=color, lw=lw)
         ax.plot([x, x], [y, y], [z - size, z + size], color=color, lw=lw)
 
     plot_3d_plus(ax, p[0, 0],  p[0, 1],  p[0, 2],  size=0.3, color='#32CD32')
-    plot_3d_plus(ax, 0, 0, 2, size=0.3, color='#E10600')
+    plot_3d_plus(ax, desired_pos[0], desired_pos[1],
+                 desired_pos[2], size=0.3, color='#E10600')
 
     drone = HexacopterSprite(arm_len=0.5, rotor_r=0.1).draw(ax)
 
