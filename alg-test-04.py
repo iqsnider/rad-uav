@@ -48,17 +48,33 @@ def euler_from_R(R):
     return phi, theta, psi
 
 
-def lagrange_multiplier(p, pdot, q, qdot, u, L, md, mp) -> float:
+# def lagrange_multiplier(p, pdot, q, qdot, u, L, md, mp) -> float:
+#     """
+#     Computes the lagrange multiplier of the taught slung payload problem.
+#     """
+#     r = q - p
+#     rd = qdot - pdot
+#
+#     num = (1/md)*(r.T@u) - (rd@rd)
+#     den = 2*(L*L)*(1/mp + 1/md)
+#
+#     return num/den
+def lagrange_multiplier(p, pdot, q, qdot, u_w, L, md, mp, alpha=5, beta=15):
     """
-    Computes the lagrange multiplier of the taught slung payload problem.
+    Computes the lagrange mltiplier of the taught slung payload problem and numerically stabilizes the simulation with baumgarte gains
     """
     r = q - p
     rd = qdot - pdot
 
-    num = (1/md)*(r.T@u) - (rd@rd)
-    den = 2*(L*L)*(1/mp + 1/md)
+    # constraint
+    c = r@r - L**2
+    cdot = 2.0 * (r @ rd)
 
-    return num/den
+    # enforce cddot + 2*alpha*cdot + beta^2*c = 0
+    num = (1/md)*(r@u_w) - (rd@rd) - alpha*cdot - 0.5*(beta**2)*c
+    den = 2*(L**2) * (1/mp + 1/md)
+
+    return num / den
 
 
 def pd_hover_controller(p, pdot, euler, omega, m, g,
@@ -69,8 +85,8 @@ def pd_hover_controller(p, pdot, euler, omega, m, g,
                         Kp_att=np.diag([8, 8, 4]),
                         Kd_att=np.diag([2.5, 2.5, 1.5])):
     """
+    Cascaded PD controller
     """
-
     phi, theta, psi = euler
     max_tilt = np.deg2rad(35)
 
@@ -83,19 +99,19 @@ def pd_hover_controller(p, pdot, euler, omega, m, g,
     # compute approximate desired roll and pitch
     ax = a_cmd[0]
     ay = a_cmd[1]
-    c = np.cos(yaw_ref)
-    s = np.sin(yaw_ref)
+    c_psi = np.cos(yaw_ref)
+    s_psi = np.sin(yaw_ref)
 
-    theta_d = (ax*c + ay*s)/g
-    phi_d = (ax*s - ay*c)/g
+    theta_cmd = (ax*c_psi + ay*s_psi)/g
+    phi_cmd = (ax*s_psi - ay*c_psi)/g
 
     # tilt limits
-    theta_d = np.clip(theta_d, -max_tilt, max_tilt)
-    phi_d = np.clip(phi_d,   -max_tilt, max_tilt)
+    theta_cmd = np.clip(theta_cmd, -max_tilt, max_tilt)
+    phi_cmd = np.clip(phi_cmd,   -max_tilt, max_tilt)
 
     # inner loop attitude PD
-    e_eta = np.array([phi_d - phi,
-                      theta_d - theta,
+    e_eta = np.array([phi_cmd - phi,
+                      theta_cmd - theta,
                       wrap_angle(yaw_ref - psi)])
 
     tau = Kp_att@e_eta + Kd_att@(0 - omega)
@@ -183,7 +199,7 @@ if __name__ == '__main__':
               "mp": 1,
               "Lc": 1,
               "g": 9.81,
-              "J": np.diag([0.03, 0.03, 0.05]),
+              "J": 10*np.diag([0.03, 0.03, 0.05]),
               "p_ref": np.array([2, 2, 2]),
               "yaw_ref": 0,
               "Kp_pos": np.diag([2, 2, 6]),
@@ -197,8 +213,8 @@ if __name__ == '__main__':
     total_frames = fps*(tf - t0)
     t_eval = np.linspace(t0, tf, total_frames)
 
-    sol = solve_ivp(lambda t, x: uav_payload_system(t, x, params),
-                    (t0, tf), x0, t_eval=t_eval)
+    sol = solve_ivp(uav_payload_system, (t0, tf),
+                    x0, args=[params], t_eval=t_eval)
 
     X = sol.y.T
 
