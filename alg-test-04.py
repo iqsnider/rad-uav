@@ -200,8 +200,8 @@ if __name__ == '__main__':
               "Lc": 1,
               "g": 9.81,
               "J": np.diag([0.03, 0.03, 0.05]),
-              "p_ref": np.array([2, 2, 2]),
-              "yaw_ref": 0,
+              "p_ref": np.array([3, 2, 2]),
+              "yaw_ref": 1,
               "Kp_pos": np.diag([2, 2, 6]),
               "Kd_pos": np.diag([2.5, 2.5, 4]),
               "Kp_att": np.diag([8, 8, 4]),
@@ -243,6 +243,14 @@ if __name__ == '__main__':
                             color='c', marker='o', markersize=7)[0]
     attach_point = ax.plot([p[0, 0]], [p[0, 1]], [p[0, 2]],
                            color='m', marker='o', markersize=7)[0]
+    fig_title = ax.set_title("Cascaded PD Controller\n"
+                             f"$p = ({p[0, 0]:.2f}, {
+                                 p[0, 1]:.2f}, {p[0, 2]:.2f})$ "
+                             f"$p_{{ref}} = ({params['p_ref'][0]:.2f}, {params['p_ref'][1]:.2f}, {
+                                 params['p_ref'][2]:.2f})$\n"
+                             f"$q = ({q[0, 0]:.2f}, {
+                                     q[0, 1]:.2f}, {q[0, 2]:.2f})$ "
+                             f"$q_{{ref}} = (\\cdot)$")
 
     def plot_3d_plus(ax, x, y, z, size=0.1, color='k', lw=1):
         """
@@ -275,12 +283,20 @@ if __name__ == '__main__':
     def animate(k):
         roll, pitch, yaw = rpy[k]
         drone.update(p=p[k], roll=roll, pitch=pitch, yaw=yaw)
+        fig_title.set_text("Slung Payload Model with Cascaded PD Controller\n\n"
+                           f"$p_{{drone}} = ({p[k, 0]:.2f}, {p[k, 1]:.2f}, {
+                               p[k, 2]:.2f}) $ "
+                           f"$p_{{ref}} = ({params['p_ref'][0]:.2f}, {params['p_ref'][1]:.2f}, {
+                               params['p_ref'][2]:.2f})$\n"
+                           f"$q_{{payload}} = ({q[k, 0]:.2f}, {
+                               q[k, 1]:.2f}, {q[k, 2]:.2f})$ "
+                           f"$q_{{ref}} = (\\cdot)$")
 
         payload_point.set_data_3d([q[k, 0]], [q[k, 1]], [q[k, 2]])
         attach_point.set_data_3d([p[k, 0]], [p[k, 1]], [p[k, 2]])
         cable_line.set_data_3d([p[k, 0], q[k, 0]], [
             p[k, 1], q[k, 1]], [p[k, 2], q[k, 2]])
-        return drone._arm_lines + drone._rotor_lines + [payload_point, attach_point, cable_line]
+        return drone._arm_lines + drone._rotor_lines + [payload_point, attach_point, cable_line, fig_title]
 
     ani = FuncAnimation(fig, animate, frames=len(
         t_eval), interval=20)
