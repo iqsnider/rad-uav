@@ -48,33 +48,17 @@ def euler_from_R(R):
     return phi, theta, psi
 
 
-# def lagrange_multiplier(p, pdot, q, qdot, u, L, md, mp) -> float:
-#     """
-#     Computes the lagrange multiplier of the taught slung payload problem.
-#     """
-#     r = q - p
-#     rd = qdot - pdot
-#
-#     num = (1/md)*(r.T@u) - (rd@rd)
-#     den = 2*(L*L)*(1/mp + 1/md)
-#
-#     return num/den
-def lagrange_multiplier(p, pdot, q, qdot, u_w, L, md, mp, alpha=5, beta=15):
+def lagrange_multiplier(p, pdot, q, qdot, u, L, md, mp) -> float:
     """
-    Computes the lagrange mltiplier of the taught slung payload problem and numerically stabilizes the simulation with baumgarte gains
+    Computes the lagrange multiplier of the taught slung payload problem.
     """
     r = q - p
     rd = qdot - pdot
 
-    # constraint
-    c = r@r - L**2
-    cdot = 2.0 * (r @ rd)
+    num = (1/md)*(r.T@u) - (rd@rd)
+    den = 2*(L*L)*(1/mp + 1/md)
 
-    # enforce cddot + 2*alpha*cdot + beta^2*c = 0
-    num = (1/md)*(r@u_w) - (rd@rd) - alpha*cdot - 0.5*(beta**2)*c
-    den = 2*(L**2) * (1/mp + 1/md)
-
-    return num / den
+    return num/den
 
 
 def pd_hover_controller(p, pdot, euler, omega, m, g,
@@ -162,7 +146,7 @@ def uav_payload_system(t, x, params):
     F_b = np.array([0, 0, Z]) + R.T@F_cable_lab
 
     # translational dynamics (body frame)
-    vdot_b = np.cross(omega, v_b) + (1/md)*F_b - g*(R.T@e_z_lab)
+    vdot_b = -np.cross(omega, v_b) + (1/md)*F_b - g*(R.T@e_z_lab)
 
     # rotational dynamics (body frame)
     J = params["J"]
@@ -200,7 +184,7 @@ if __name__ == '__main__':
               "Lc": 1,
               "g": 9.81,
               "J": np.diag([0.03, 0.03, 0.05]),
-              "p_ref": np.array([3, 2, 2]),
+              "p_ref": np.array([15, 2, 2]),
               "yaw_ref": 1,
               "Kp_pos": np.diag([2, 2, 6]),
               "Kd_pos": np.diag([2.5, 2.5, 4]),
@@ -214,7 +198,7 @@ if __name__ == '__main__':
     t_eval = np.linspace(t0, tf, total_frames)
 
     sol = solve_ivp(uav_payload_system, (t0, tf),
-                    x0, args=[params], t_eval=t_eval)
+                    x0, args=[params], t_eval=t_eval, method='RK45')
 
     X = sol.y.T
 
@@ -248,9 +232,9 @@ if __name__ == '__main__':
                                  p[0, 1]:.2f}, {p[0, 2]:.2f})$ "
                              f"$p_{{ref}} = ({params['p_ref'][0]:.2f}, {params['p_ref'][1]:.2f}, {
                                  params['p_ref'][2]:.2f})$\n"
-                             f"$q = ({q[0, 0]:.2f}, {
+                             f"$p = ({q[0, 0]:.2f}, {
                                      q[0, 1]:.2f}, {q[0, 2]:.2f})$ "
-                             f"$q_{{ref}} = (\\cdot)$")
+                             f"$p_{{ref}} = (\\cdot)$")
 
     def plot_3d_plus(ax, x, y, z, size=0.1, color='k', lw=1):
         """
@@ -288,9 +272,9 @@ if __name__ == '__main__':
                                p[k, 2]:.2f}) $ "
                            f"$p_{{ref}} = ({params['p_ref'][0]:.2f}, {params['p_ref'][1]:.2f}, {
                                params['p_ref'][2]:.2f})$\n"
-                           f"$q_{{payload}} = ({q[k, 0]:.2f}, {
+                           f"$p_{{payload}} = ({q[k, 0]:.2f}, {
                                q[k, 1]:.2f}, {q[k, 2]:.2f})$ "
-                           f"$q_{{ref}} = (\\cdot)$")
+                           f"$p_{{ref}} = (\\cdot)$")
 
         payload_point.set_data_3d([q[k, 0]], [q[k, 1]], [q[k, 2]])
         attach_point.set_data_3d([p[k, 0]], [p[k, 1]], [p[k, 2]])
