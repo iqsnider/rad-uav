@@ -173,7 +173,8 @@ if __name__ == '__main__':
     euler0 = np.zeros(3)
     omega0 = np.zeros(3)
 
-    Lc = 1
+    Lc = 3
+
     q0 = p0 + np.array([0, 0, -Lc])
     qdot0 = v0b + np.array([0, 0, 0])
 
@@ -181,10 +182,10 @@ if __name__ == '__main__':
 
     params = {"md": 2,
               "mp": 1,
-              "Lc": 1,
+              "Lc": Lc,
               "g": 9.81,
               "J": np.diag([0.03, 0.03, 0.05]),
-              "p_ref": np.array([15, 2, 2]),
+              "p_ref": np.array([3, 2, 2]),
               "yaw_ref": 1,
               "Kp_pos": np.diag([2, 2, 6]),
               "Kd_pos": np.diag([2.5, 2.5, 4]),
