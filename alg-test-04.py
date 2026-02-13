@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.typing import NDArray
 import matplotlib.pyplot as plt
 
 from matplotlib.animation import FuncAnimation
@@ -6,11 +7,11 @@ from scipy.integrate import solve_ivp
 from core.viz_copter import HexacopterSprite
 
 
-def wrap_angle(a):
+def wrap_angle(a) -> float:
     return (a + np.pi) % (2*np.pi) - np.pi
 
 
-def YPR_to_R(yaw, pitch, roll):
+def YPR_to_R(yaw, pitch, roll) -> NDArray[np.float64]:
     """
     Rotates vectors from body frame to world frame given yaw, pitch, and roll.
     """
@@ -25,7 +26,7 @@ def YPR_to_R(yaw, pitch, roll):
     return R_BE
 
 
-def euler_rates_matrix(roll, pitch):
+def euler_rates_matrix(roll, pitch) -> NDArray[np.float64]:
     """
     Time derivative of euler angles.
     """
@@ -37,9 +38,9 @@ def euler_rates_matrix(roll, pitch):
                      [0, sr/cp, cr/cp]])
 
 
-def euler_from_R(R_BE):
+def euler_from_R(R_BE) -> tuple[float, float, float]:
     """
-    Extracts Euler angles from rotation tensor.
+    Extracts Euler angles from rotation matrix.
     """
     theta = -np.arcsin(R_BE[2, 0])
     phi = np.arctan2(R_BE[2, 1], R_BE[2, 2])
@@ -67,7 +68,7 @@ def pd_hover_controller(p1, p1dot, euler, omega, m, g,
                         Kp_pos=np.diag([2, 2, 6]),
                         Kd_pos=np.diag([2.5, 2.5, 4]),
                         Kp_att=np.diag([8, 8, 4]),
-                        Kd_att=np.diag([2.5, 2.5, 1.5])):
+                        Kd_att=np.diag([2.5, 2.5, 1.5])) -> tuple[float, float, float, float]:
     """
     Cascaded PD controller
     """
@@ -104,7 +105,7 @@ def pd_hover_controller(p1, p1dot, euler, omega, m, g,
     return Z, L, M, N
 
 
-def uav_payload_system(t, x, params):
+def uav_payload_system(t, x, params) -> NDArray[np.float64]:
     """
     The 12-state aircraft dynamics + 6-state point mass payload model.
     """
@@ -127,7 +128,7 @@ def uav_payload_system(t, x, params):
     # kinematics
     p1dot = R_BE@v_b
     E = euler_rates_matrix(phi, theta)
-    eulerdot = E@omega
+    rpydot = E@omega
 
     # control
     Z, L, M, N = pd_hover_controller(p1, p1dot, rpy, omega, md + mp, g,
@@ -159,7 +160,7 @@ def uav_payload_system(t, x, params):
     xdot = np.zeros_like(x)
     xdot[0:3] = p1dot
     xdot[3:6] = vdot_b
-    xdot[6:9] = eulerdot
+    xdot[6:9] = rpydot
     xdot[9:12] = omega_dot
     xdot[12:15] = p2dot
     xdot[15:18] = p2ddot
