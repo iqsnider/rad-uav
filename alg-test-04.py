@@ -10,31 +10,46 @@ def wrap_angle(a):
     return (a + np.pi) % (2*np.pi) - np.pi
 
 
-def rpy_to_R(roll, pitch, yaw):
+# def rpy_to_R(roll, pitch, yaw):
+#     """
+#     Rotates vectors from body frame to world frame given roll, pitch, and yaw.
+#     """
+#     cr, sr = np.cos(roll), np.sin(roll)
+#     cp, sp = np.cos(pitch), np.sin(pitch)
+#     cy, sy = np.cos(yaw), np.sin(yaw)
+#
+#     Rpsi = np.array([[cy, sy, 0],
+#                      [-sy, cy, 0],
+#                      [0, 0, 1]])
+#     Rtheta = np.array([[cp, 0, -sp],
+#                        [0, 1, 0],
+#                        [sp, 0, cp]])
+#     Rphi = np.array([[1, 0, 0],
+#                      [0, cr, sr],
+#                      [0, -sr, cr]])
+#     return Rphi @ Rtheta @ Rpsi
+
+
+def YPR_to_R(yaw, pitch, roll):
     """
-    Rotates vectors from body frame to world frame given roll, pitch, and yaw.
+    Rotates vectors from body frame to world frame given yaw, pitch, and roll.
     """
     cr, sr = np.cos(roll), np.sin(roll)
     cp, sp = np.cos(pitch), np.sin(pitch)
     cy, sy = np.cos(yaw), np.sin(yaw)
 
-    Rz = np.array([[cy, -sy, 0],
-                   [sy, cy, 0],
-                   [0, 0, 1]])
-    Ry = np.array([[cp, 0, sp],
-                   [0, 1, 0],
-                   [-sp, 0, cp]])
-    Rx = np.array([[1, 0, 0],
-                   [0, cr, -sr],
-                   [0, sr, cr]])
-    return Rz @ Ry @ Rx
+    R_BE = np.array([[cp*cy, sr*sp*cy - cr*sy, cr*sp*cy + sr*sy],
+                     [cp*sy, sr*sp*sy + cr*cy, cr*sp*sy - sr*cy],
+                    [-sp, sr*cp, cr*cp]])
+
+    return R_BE
 
 
 def euler_rates_matrix(roll, pitch):
     sr, cr = np.sin(roll), np.cos(roll)
     tp, cp = np.tan(pitch), np.cos(pitch)
     return np.array([[1, sr*tp, cr*tp],
-                     [0, cr,     -sr],
+                     [0, cr, -sr],
                      [0, sr/cp, cr/cp]])
 
 
@@ -121,7 +136,7 @@ def uav_payload_system(t, x, params):
     qdot = x[15:18]
 
     phi, theta, psi = euler
-    R = rpy_to_R(phi, theta, psi)
+    R = YPR_to_R(psi, theta, phi)
     e_z_lab = np.array([0, 0, 1])  # lab frame
 
     # kinematics
@@ -234,7 +249,7 @@ if __name__ == '__main__':
                              f"$p_{{ref}} = ({params['p_ref'][0]:.2f}, {params['p_ref'][1]:.2f}, {
                                  params['p_ref'][2]:.2f})$\n"
                              f"$p = ({q[0, 0]:.2f}, {
-                                     q[0, 1]:.2f}, {q[0, 2]:.2f})$ "
+                                 q[0, 1]:.2f}, {q[0, 2]:.2f})$ "
                              f"$p_{{ref}} = (\\cdot)$")
 
     def plot_3d_plus(ax, x, y, z, size=0.1, color='k', lw=1):

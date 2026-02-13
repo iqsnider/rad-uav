@@ -2,24 +2,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def rpy_to_R(roll, pitch, yaw):
+def YPR_to_R(yaw, pitch, roll):
     """
-    Rotates vectors from body frame to world frame given roll, pitch, and yaw.
+    Rotates vectors from body frame to world frame given yaw, pitch, and roll.
     """
     cr, sr = np.cos(roll), np.sin(roll)
     cp, sp = np.cos(pitch), np.sin(pitch)
     cy, sy = np.cos(yaw), np.sin(yaw)
 
-    Rz = np.array([[cy, -sy, 0],
-                   [sy, cy, 0],
-                   [0, 0, 1]])
-    Ry = np.array([[cp, 0, sp],
-                   [0, 1, 0],
-                   [-sp, 0, cp]])
-    Rx = np.array([[1, 0, 0],
-                   [0, cr, -sr],
-                   [0, sr, cr]])
-    return Rz @ Ry @ Rx
+    R_BE = np.array([[cp*cy, sr*sp*cy - cr*sy, cr*sp*cy + sr*sy],
+                     [cp*sy, sr*sp*sy + cr*cy, cr*sp*sy - sr*cy],
+                    [-sp, sr*cp, cr*cp]])
+
+    return R_BE
 
 
 class HexacopterSprite:
@@ -95,7 +90,7 @@ class HexacopterSprite:
         """
         p = np.asarray(p).reshape(3, 1)
         if R is None:
-            R = rpy_to_R(roll, pitch, yaw)
+            R = YPR_to_R(yaw, pitch, roll)
 
         # update arms
         for i, body_arm in enumerate(self.body_arm_lines):
