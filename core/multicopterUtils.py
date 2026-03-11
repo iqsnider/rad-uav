@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from scipy.integrate import solve_ivp
 from numpy.typing import NDArray
-from core.viz_copter import HexacopterSprite
+from viz_copter import HexacopterSprite
 
 
 def wrap_angle(a) -> float:
@@ -19,11 +19,11 @@ def YPR_to_R(yaw, pitch, roll) -> NDArray[np.float64]:
     cp, sp = np.cos(pitch), np.sin(pitch)
     cy, sy = np.cos(yaw), np.sin(yaw)
 
-    R_BE = np.array([[cp*cy, sr*sp*cy - cr*sy, cr*sp*cy + sr*sy],
+    T_EB = np.array([[cp*cy, sr*sp*cy - cr*sy, cr*sp*cy + sr*sy],
                      [cp*sy, sr*sp*sy + cr*cy, cr*sp*sy - sr*cy],
                     [-sp, sr*cp, cr*cp]])
 
-    return R_BE
+    return T_EB
 
 
 def euler_rates_matrix(roll, pitch) -> NDArray[np.float64]:
@@ -169,7 +169,7 @@ def uav_payload_system(t, x, params) -> NDArray[np.float64]:
 
 
 if __name__ == '__main__':
-    p10 = np.array([0, 0, 0])
+    p10 = np.array([0, 0, 1])
     v0b = np.zeros(3)
     euler0 = np.zeros(3)
     omega0 = np.zeros(3)
@@ -186,7 +186,7 @@ if __name__ == '__main__':
               "Lc": Lc,
               "g": 9.81,
               "J": np.diag([0.03, 0.03, 0.05]),
-              "p_ref": np.array([3, 2, 2]),
+              "p_ref": np.array([3, 2, 7]),
               "yaw_ref": 1,
               "Kp_pos": np.diag([2, 2, 6]),
               "Kd_pos": np.diag([2.5, 2.5, 4]),
