@@ -38,17 +38,6 @@ def euler_rates_matrix(roll, pitch) -> NDArray[np.float64]:
                      [0, sr/cp, cr/cp]])
 
 
-def euler_from_R(R_BE) -> tuple[float, float, float]:
-    """
-    Extracts Euler angles from rotation matrix.
-    """
-    theta = -np.arcsin(R_BE[2, 0])
-    phi = np.arctan2(R_BE[2, 1], R_BE[2, 2])
-    psi = np.arctan2(R_BE[1, 0], R_BE[0, 0])
-
-    return phi, theta, psi
-
-
 def lagrange_multiplier(p1, p1dot, p2, p2dot, u, L, md, mp) -> float:
     """
     Computes the Lagrange multiplier of the taught two-point-mass slung payload problem.

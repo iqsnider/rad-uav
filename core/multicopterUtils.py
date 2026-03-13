@@ -7,165 +7,165 @@ from numpy.typing import NDArray
 from viz_copter import HexacopterSprite
 
 
-def wrap_angle(a) -> float:
-    return (a + np.pi) % (2*np.pi) - np.pi
-
-
-def YPR_to_R(yaw, pitch, roll) -> NDArray[np.float64]:
+class Drone(object):
     """
-    Rotates vectors from body frame to world frame given yaw, pitch, and roll.
+    Defines a drone from given parameters.
     """
-    cr, sr = np.cos(roll), np.sin(roll)
-    cp, sp = np.cos(pitch), np.sin(pitch)
-    cy, sy = np.cos(yaw), np.sin(yaw)
 
-    T_EB = np.array([[cp*cy, sr*sp*cy - cr*sy, cr*sp*cy + sr*sy],
-                     [cp*sy, sr*sp*sy + cr*cy, cr*sp*sy - sr*cy],
-                    [-sp, sr*cp, cr*cp]])
+    def __init__(self, params):
+        self.params = params
 
-    return T_EB
+    def _YPR_to_T_EB(self, yaw, pitch, roll) -> NDArray[np.float64]:
+        """
+        Provides a transformation matrix from B to E (T^EB) given yaw, pitch, and roll.
+        """
+        cr, sr = np.cos(roll), np.sin(roll)
+        cp, sp = np.cos(pitch), np.sin(pitch)
+        cy, sy = np.cos(yaw), np.sin(yaw)
 
+        T_EB = np.array([[cp*cy, sr*sp*cy - cr*sy, cr*sp*cy + sr*sy],
+                         [cp*sy, sr*sp*sy + cr*cy, cr*sp*sy - sr*cy],
+                        [-sp, sr*cp, cr*cp]])
 
-def euler_rates_matrix(roll, pitch) -> NDArray[np.float64]:
-    """
-    Time derivative of euler angles.
-    """
-    sr, cr = np.sin(roll), np.cos(roll)
-    tp, cp = np.tan(pitch), np.cos(pitch)
+        return T_EB
 
-    return np.array([[1, sr*tp, cr*tp],
-                     [0, cr, -sr],
-                     [0, sr/cp, cr/cp]])
+    def _euler_rates_matrix(self, roll, pitch) -> NDArray[np.float64]:
+        """
+        Time derivative of the euler angles.
+        """
+        sr, cr = np.sin(roll), np.cos(roll)
+        tp, cp = np.tan(pitch), np.cos(pitch)
 
+        return np.array([[1, sr*tp, cr*tp],
+                         [0, cr, -sr],
+                         [0, sr/cp, cr/cp]])
 
-def euler_from_R(R_BE) -> tuple[float, float, float]:
-    """
-    Extracts Euler angles from rotation matrix.
-    """
-    theta = -np.arcsin(R_BE[2, 0])
-    phi = np.arctan2(R_BE[2, 1], R_BE[2, 2])
-    psi = np.arctan2(R_BE[1, 0], R_BE[0, 0])
+    def _wrap_angle(self, a) -> float:
+        """
+        Wraps angle.
+        """
+        return (a + np.pi) % (2*np.pi) - np.pi
 
-    return phi, theta, psi
+    def lagrange_multiplier(self, sBT, vEB, sPT, vEP, u, L, mB, mP) -> float:
+        """
+        Computes the Lagrange multiplier of the taught two-point-mass slung payload problem.
+        """
+        r = sPT - sBT
+        rd = vEP - vEB
 
+        num = (1/mB)*(r@u) - (rd@rd)
+        den = 2*(L*L)*(1/mP + 1/mB)
 
-def lagrange_multiplier(p1, p1dot, p2, p2dot, u, L, md, mp) -> float:
-    """
-    Computes the Lagrange multiplier of the taught two-point-mass slung payload problem.
-    """
-    r = p2 - p1
-    rd = p2dot - p1dot
+        return num/den
 
-    num = (1/md)*(r@u) - (rd@rd)
-    den = 2*(L*L)*(1/mp + 1/md)
+    def pd_hover_controller(self, sBT, vEB, euler, omega, m, g,
+                            p_ref=np.array([0, 0, 2]),
+                            yaw_ref=0,
+                            Kp_pos=np.diag([2, 2, 6]),
+                            Kd_pos=np.diag([2.5, 2.5, 4]),
+                            Kp_att=np.diag([8, 8, 4]),
+                            Kd_att=np.diag([2.5, 2.5, 1.5])) -> tuple[float, float, float, float]:
+        """
+        Cascaded PD controller
+        """
+        phi, theta, psi = euler
+        max_tilt = np.deg2rad(35)
 
-    return num/den
+        # outer loop PD (earth frame)
+        a_cmd_E = Kp_pos@(p_ref - sBT) + Kd_pos@(0 - vEB)
 
+        # vertial thrust
+        Z = m*(g + a_cmd_E[2])
 
-def pd_hover_controller(p1, p1dot, euler, omega, m, g,
-                        p_ref=np.array([0, 0, 2]),
-                        yaw_ref=0,
-                        Kp_pos=np.diag([2, 2, 6]),
-                        Kd_pos=np.diag([2.5, 2.5, 4]),
-                        Kp_att=np.diag([8, 8, 4]),
-                        Kd_att=np.diag([2.5, 2.5, 1.5])) -> tuple[float, float, float, float]:
-    """
-    Cascaded PD controller
-    """
-    phi, theta, psi = euler
-    max_tilt = np.deg2rad(35)
+        # compute approximate desired roll and pitch
+        ax = a_cmd_E[0]
+        ay = a_cmd_E[1]
+        c_psi = np.cos(yaw_ref)
+        s_psi = np.sin(yaw_ref)
 
-    # outer loop PD (lab frame)
-    a_cmd = Kp_pos@(p_ref - p1) + Kd_pos@(0 - p1dot)
+        theta_cmd = (ax*c_psi + ay*s_psi)/g
+        phi_cmd = (ax*s_psi - ay*c_psi)/g
 
-    # vertial thrust
-    Z = m*(g + a_cmd[2])
+        # tilt limits
+        theta_cmd = np.clip(theta_cmd, -max_tilt, max_tilt)
+        phi_cmd = np.clip(phi_cmd, -max_tilt, max_tilt)
 
-    # compute approximate desired roll and pitch
-    ax = a_cmd[0]
-    ay = a_cmd[1]
-    c_psi = np.cos(yaw_ref)
-    s_psi = np.sin(yaw_ref)
+        # inner loop attitude PD
+        e_eta = np.array([phi_cmd - phi,
+                          theta_cmd - theta,
+                          self._wrap_angle(yaw_ref - psi)])
 
-    theta_cmd = (ax*c_psi + ay*s_psi)/g
-    phi_cmd = (ax*s_psi - ay*c_psi)/g
+        nB = Kp_att@e_eta + Kd_att@(0 - omega)
+        L, M, N = nB
 
-    # tilt limits
-    theta_cmd = np.clip(theta_cmd, -max_tilt, max_tilt)
-    phi_cmd = np.clip(phi_cmd,   -max_tilt, max_tilt)
+        return Z, L, M, N
 
-    # inner loop attitude PD
-    e_eta = np.array([phi_cmd - phi,
-                      theta_cmd - theta,
-                      wrap_angle(yaw_ref - psi)])
+    def uav_swing_payload_system(self, t, x) -> NDArray[np.float64]:
+        """
+        The 12-state aircraft dynamics + 6-state point mass payload model.
+        """
+        mB = self.params["mB"]
+        mP = self.params["mP"]
+        Lc = self.params["Lc"]
+        g = self.params.get("g", 9.81)
 
-    tau = Kp_att@e_eta + Kd_att@(0 - omega)
-    L, M, N = tau
+        sBTE = x[0:3]
+        vEBB = x[3:6]
+        rpy = x[6:9]
+        omegaBEB = x[9:12]
+        sPTE = x[12:15]
+        vEPE = x[15:18]
 
-    return Z, L, M, N
+        phi, theta, psi = rpy
+        T_EB = self._YPR_to_T_EB(psi, theta, phi)
+        T_BE = T_EB.T
+        e3E = np.array([0, 0, 1])  # lab frame
 
+        # kinematics
+        vEBE = T_EB@vEBB
+        E = self._euler_rates_matrix(phi, theta)
+        ddt_rpy = E@omegaBEB
 
-def uav_payload_system(t, x, params) -> NDArray[np.float64]:
-    """
-    The 12-state aircraft dynamics + 6-state point mass payload model.
-    """
-    md = params["md"]
-    mp = params["mp"]
-    Lc = params["Lc"]
-    g = params.get("g", 9.81)
+        # control
+        Z, L, M, N = self.pd_hover_controller(sBTE, vEBE, rpy, omegaBEB, mB + mP, g,
+                                              p_ref=self.params["p_ref"],
+                                              yaw_ref=self.params["yaw_ref"],
+                                              Kp_pos=self.params["Kp_pos"],
+                                              Kd_pos=self.params["Kd_pos"],
+                                              Kp_att=self.params["Kp_att"],
+                                              Kd_att=self.params["Kd_att"])
 
-    p1 = x[0:3]
-    v_b = x[3:6]
-    rpy = x[6:9]
-    omega = x[9:12]
-    p2 = x[12:15]
-    p2dot = x[15:18]
+        uE = T_EB@np.array([0, 0, Z])
+        lam = self.lagrange_multiplier(sBTE, vEBE, sPTE, vEPE, uE, Lc, mB, mP)
+        sPBE = sPTE - sBTE
 
-    phi, theta, psi = rpy
-    R_BE = YPR_to_R(psi, theta, phi)
-    e_z_lab = np.array([0, 0, 1])  # lab frame
+        F_cable_E = -2*lam*sPBE
+        F_B = np.array([0, 0, Z]) + T_BE@F_cable_E
 
-    # kinematics
-    p1dot = R_BE@v_b
-    E = euler_rates_matrix(phi, theta)
-    rpydot = E@omega
+        # translational dynamics (body frame)
+        OmegaBEB = np.array([[0, -omegaBEB[2], omegaBEB[1]],
+                             [omegaBEB[2], 0, -omegaBEB[0]],
+                             [-omegaBEB[1], omegaBEB[0], 0]])
 
-    # control
-    Z, L, M, N = pd_hover_controller(p1, p1dot, rpy, omega, md + mp, g,
-                                     p_ref=params["p_ref"],
-                                     yaw_ref=params["yaw_ref"],
-                                     Kp_pos=params["Kp_pos"],
-                                     Kd_pos=params["Kd_pos"],
-                                     Kp_att=params["Kp_att"],
-                                     Kd_att=params["Kd_att"])
+        aEBB = -OmegaBEB@vEBB + (1/mB)*F_B - g*(T_BE@e3E)
 
-    u_lab = R_BE@np.array([0, 0, Z])
-    lam = lagrange_multiplier(p1, p1dot, p2, p2dot, u_lab, Lc, md, mp)
-    r = p2 - p1
+        # rotational dynamics (body frame)
+        J = self.params["J"]
+        nBB = np.array([L, M, N])
+        ddt_omega_BEB = np.linalg.inv(J)@(nBB - OmegaBEB@J@omegaBEB)
 
-    F_cable_lab = -2*lam*r
-    F_b = np.array([0, 0, Z]) + R_BE.T@F_cable_lab
+        # payload dynamics (lab frame)
+        aEPE = -g*e3E - (1/mP)*F_cable_E
 
-    # translational dynamics (body frame)
-    vdot_b = -np.cross(omega, v_b) + (1/md)*F_b - g*(R_BE.T@e_z_lab)
+        xdot = np.zeros_like(x)
+        xdot[0:3] = vEBE
+        xdot[3:6] = aEBB
+        xdot[6:9] = ddt_rpy
+        xdot[9:12] = ddt_omega_BEB
+        xdot[12:15] = vEPE
+        xdot[15:18] = aEPE
 
-    # rotational dynamics (body frame)
-    J = params["J"]
-    tau = np.array([L, M, N])
-    omega_dot = np.linalg.inv(J)@(tau - np.cross(omega, J@omega))
-
-    # payload dynamics (lab frame)
-    p2ddot = -g*e_z_lab - (1/mp)*F_cable_lab
-
-    xdot = np.zeros_like(x)
-    xdot[0:3] = p1dot
-    xdot[3:6] = vdot_b
-    xdot[6:9] = rpydot
-    xdot[9:12] = omega_dot
-    xdot[12:15] = p2dot
-    xdot[15:18] = p2ddot
-
-    return xdot
+        return xdot
 
 
 if __name__ == '__main__':
@@ -181,8 +181,8 @@ if __name__ == '__main__':
 
     x0 = np.hstack([p10, v0b, euler0, omega0, p20, p2dot0])
 
-    params = {"md": 2,
-              "mp": 1,
+    params = {"mB": 2,
+              "mP": 1,
               "Lc": Lc,
               "g": 9.81,
               "J": np.diag([0.03, 0.03, 0.05]),
@@ -199,8 +199,10 @@ if __name__ == '__main__':
     total_frames = fps*(tf - t0)
     t_eval = np.linspace(t0, tf, total_frames)
 
-    sol = solve_ivp(uav_payload_system, (t0, tf),
-                    x0, args=[params], t_eval=t_eval, method='RK45')
+    drone = Drone(params)
+
+    sol = solve_ivp(drone.uav_swing_payload_system, (t0, tf),
+                    x0, t_eval=t_eval, method='RK45')
 
     X = sol.y.T
 
